@@ -39,6 +39,7 @@ url = 'https://www.pressreader.com/catalog'
     
 
 browser = webdriver.Chrome()
+browser.maximize_window()
 browser.get(url)
 time.sleep(1)
 
@@ -52,7 +53,7 @@ allow_button.click()
 element = WebDriverWait(browser,60).until(EC.visibility_of_element_located((By.XPATH,"//div[text()='All countries/regions']")))
 element.click()
 
-checkbox = WebDriverWait(browser,10).until(EC.visibility_of_element_located((By.XPATH,"//div[@class='title' and text()='All countries/regions']")))
+checkbox = WebDriverWait(browser,60).until(EC.visibility_of_element_located((By.XPATH,"//div[@class='title' and text()='All countries/regions']")))
 checkbox.click()
 
 soup = BeautifulSoup(browser.page_source, 'lxml')
@@ -63,34 +64,28 @@ div = soup.find('ul', class_="navfilter-list")
 
 countries_list = div.select('li[class*="is-available"]')
 
-
+results = {}
 
 
 for country in countries_list:
     country_name = country.find('div',class_="title").get_text()
+    results[country_name] = set()
     code = countries.get(country_name,"")
-    redirect_url = url + "?country={}".format(code)
-    browser.get(url)
+    redirect_url = url + "/newspapers?country={}".format("us")
+    browser.get(redirect_url)
     time.sleep(5)
+    current_height = browser.execute_script('return document.body.scrollHeight')
+    while True:
+        browser.execute_script('window.scrollTo(0,document.body.scrollHeight);')
+        time.sleep(20)
+        soup = BeautifulSoup(browser.page_source, 'lxml')
+        newspaper_container = soup.find('div', class_='ReactVirtualized__Grid__innerScrollContainer')
+        if newspaper_container is None :
+            break
+        item_list = newspaper_container.select('div[class*="ssi "]')
+        results[country_name].update(set(list(map(lambda x: x.find('div', class_= 'page-source').get_text(), item_list))))
 
-
-
-
-# while True:
-#     current_height = browser.execute_script('window.scrollTo(0,document.body.scrollHeight);')
-#     time.sleep(2)
-#     new_height = browser.execute_script('return document.body.scrollHeight')
-
-#     soup = BeautifulSoup(browser.page_source, 'lxml')
-#     newspaper_container = soup.find('div', class_='ReactVirtualized__Grid__innerScrollContainer')
-#     if newspaper_container is None :
-#         continue
-#     item_list = newspaper_container.select('div[class*="ssi "]')
-#     for item in item_list:
-#         span_item = item.find('div', class_= 'page-source').get_text()
-#         print(span_item)
-    
-#     if new_height == current_height:      # this means we have reached the end of the page!
-#         html = browser.page_source
-#         break
-#     prev_height = new_height
+        new_height = browser.execute_script('return document.body.scrollHeight')
+        if new_height == current_height:
+            break
+        current_height = new_height
